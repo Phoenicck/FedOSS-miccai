@@ -28,9 +28,12 @@ def run(args):
     elif args.dataset=='OrganMNIST3D':
         param = {'dataset': args.dataset, 'Known_class': args.known_class, 'unKnown_class': args.unknown_class, 'Rotation': args.rotation, 'Resize': args.resize, 'CropSize':args.cropsize, 'Batchsize': args.batchsize, 'dirichlet': args.dirichlet}        
         from data.fed_MedMINIST3D_relabel import get_dataloaders           
+    elif args.dataset=='Cifar10':
+        param = {'dataset': args.dataset, 'Known_class': args.known_class, 'unKnown_class': args.unknown_class, 'Rotation': args.rotation, 'Resize': args.resize, 'CropSize':args.cropsize, 'Batchsize': args.batchsize, 'dirichlet': args.dirichlet}        
+        from data.fed_Cifar10 import get_dataloaders
     else:
         assert False
-    trainloaders, valloader, closerloader, openloader, train_val_loaders = get_dataloaders(args.client_num, args.data_root, args.seed, param) 
+    trainloaders, valloader, closerloader, openloader, train_val_loaders = get_dataloaders(data_root= args.data_root) 
     server_model, models, device, client_weights  = setup(args, trainloaders)   
     epoch = 0
     attack = Attack(known_class=args.known_class, eps=args.eps, num_steps=args.num_steps)

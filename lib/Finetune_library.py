@@ -44,12 +44,21 @@ def train(args, device, epoch, net, trainloader, optimizer, net_peers=None, atta
             p_upper = 1.
         if args.unknown_class == 7:            
             p_lower = 0
-            p_upper = 1.    
+            p_upper = 1. 
+
+    if args.dataset == 'Cifar10':
+        if args.unknown_class == 4:
+            p_lower = 0
+            p_upper = 1.
+        if args.unknown_class == 6:            
+            p_lower = 0
+            p_upper = 1. 
+
     unknown_dict = [None for i in range(args.known_class)]
     mean_dict = [None for i in range(args.known_class)]
     cov_dict = [None for i in range(args.known_class)]
     number_dict = torch.zeros(args.known_class)
-    for batch_idx, (inputs, targets, img_dirs) in enumerate(trainloader):
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
         gc.collect()
         torch.cuda.empty_cache()
         inputs, targets = inputs.to(device), targets.long().to(device)        
@@ -205,7 +214,7 @@ def val(args, device, epoch, net, valloader):
     label_list = []
     criterion = nn.CrossEntropyLoss()
     with torch.no_grad():
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(valloader):
+        for batch_idx, (inputs, targets) in enumerate(valloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
             outs = net(inputs)
             outputs = outs['outputs']    
@@ -332,7 +341,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
         label_list_temp = []
 
         # ---------- Closed-set evaluation ----------
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(closerloader):
+        for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
             outs = net(inputs)
             outputs = outs['outputs']    
@@ -363,7 +372,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
 
         # ---------- Collect probs for open set ----------
         prob_total = None
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(closerloader):
+        for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outs = net(inputs)
             outputs = outs['outputs']
@@ -374,9 +383,11 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
             else:
                 prob_total = torch.cat([prob_total, prob])
 
-            targets_list.append(targets.cpu().numpy())
+            #targets_list.append(targets.cpu().numpy())
+            targets_array = targets.cpu().numpy().flatten()
+            targets_list.append(targets_array)
 
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(openloader):
+        for batch_idx, (inputs, targets) in enumerate(openloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outs = net(inputs)
             outputs = outs['outputs']
@@ -384,11 +395,16 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
             prob_total = torch.cat([prob_total, prob])
 
             # unknown类标签设为 args.known_class
+            # targets = np.ones_like(targets.cpu().numpy()) * args.known_class
+            # targets_list.append(targets)
             targets = np.ones_like(targets.cpu().numpy()) * args.known_class
-            targets_list.append(targets)
+            targets_array = targets.flatten()
+            targets_list.append(targets_array)
 
         # ---------- Open set recognition ----------
-        targets_list = np.reshape(np.array(targets_list), (-1))
+        #targets_list = np.reshape(np.array(targets_list), (-1))
+        targets_list = np.concatenate(targets_list).reshape(-1)
+
         _, pred_list = prob_total.max(1)
         pred_list = pred_list.cpu().numpy()
 
