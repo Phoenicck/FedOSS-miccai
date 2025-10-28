@@ -15,6 +15,7 @@ def run(args):
     best_f1 = 0
     best_epoch = 0
     print('==> Preparing data..')
+    print(args.dataset)
     param = {'Known_class': args.known_class, 'unKnown_class': args.unknown_class, 'Rotation': args.rotation, 'Resize': args.resize, 'CropSize':args.cropsize, 'Batchsize': args.batchsize, 'dirichlet': args.dirichlet}          
     if args.dataset=='Hyperkvasir':
         from data.fed_hyper_kvasir_relabel import get_dataloaders
@@ -24,9 +25,13 @@ def run(args):
     elif args.dataset=='OrganMNIST3D':
         param = {'dataset': args.dataset, 'Known_class': args.known_class, 'unKnown_class': args.unknown_class, 'Rotation': args.rotation, 'Resize': args.resize, 'CropSize':args.cropsize, 'Batchsize': args.batchsize, 'dirichlet': args.dirichlet}        
         from data.fed_MedMINIST3D_relabel import get_dataloaders
+    elif args.dataset=='Cifar10':
+        param = {'dataset': args.dataset, 'Known_class': args.known_class, 'unKnown_class': args.unknown_class, 'Rotation': args.rotation, 'Resize': args.resize, 'CropSize':args.cropsize, 'Batchsize': args.batchsize, 'dirichlet': args.dirichlet}        
+        from data.fed_Cifar10 import get_dataloaders
     else:
         assert False
-    trainloaders, valloader, closerloader, openloader, train_val_loaders = get_dataloaders(args.client_num, args.data_root, args.seed, param) 
+
+    trainloaders, valloader, closerloader, openloader, train_val_loaders = get_dataloaders(data_root=args.data_root) 
     server_model, models, device, client_weights  = setup(args, trainloaders)   
     epoch = 0
     for epoch_it in range(args.epoches // args.worker_steps):        
@@ -37,6 +42,8 @@ def run(args):
                 client_name = args.client_names[client_idx] 
                 model, train_loader, optimizer= models[client_idx], trainloaders[client_idx], optimizers[client_idx]       
                 # Do training and validation loops
+                #print("3Trainloader[0] images shape:")
+                #print(train_loader.dataset.images.shape)
                 train_result = train(args, device, epoch, model, train_loader, optimizer)
                 train_loss, train_acc, train_f1, train_recall, train_precision = train_result['loss'], train_result['acc'],train_result['f1'],train_result['recall'], train_result['precision']
                 print(f"Train {client_name} [{epoch}/{args.epoches}] LR={args.lr:.7f} loss={train_loss:.3f} ACC={train_acc:.3f} F1={train_f1:.3f} Rec={train_recall:.3f} Prec={train_precision:.3f}")     
@@ -77,4 +84,4 @@ def run(args):
     print()
     print(f"Test-  OSR [{best_epoch}/{args.epoches}] ACC={osr_acc:.3f} F1={osr_f1:.3f} Rec={osr_recall:.3f} Prec={osr_precision:.3f}")
     print('=====================================================================================================================================')
-        
+         

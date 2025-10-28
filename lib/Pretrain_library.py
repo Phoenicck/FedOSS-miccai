@@ -16,10 +16,16 @@ def train(args, device, epoch, net, trainloader, optimizer):
     label_list = []
     output_list = []
     criterion = nn.CrossEntropyLoss()
- 
-    for batch_idx, (inputs, targets, img_dirs) in enumerate(trainloader):
+    #print("333Trainloader[0] images shape:")
+    #print(trainloader.dataset.images.shape)
+    #print(trainloader.dataset)
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
+        #print("4Inputs shape:")
+        #print(inputs.shape)
         inputs, targets = inputs.to(device), targets.long().to(device)
         optimizer.zero_grad()
+        #print("5Inputs shape:")
+        #print(inputs.shape)
         outs = net(inputs)
         outputs = outs['outputs']    
         aux_outputs = outs['aux_out']
@@ -55,9 +61,13 @@ def val(args, device, epoch, net, valloader):
     pred_list = []
     label_list = []
     criterion = nn.CrossEntropyLoss()
+    # print("222Valloader images shape:")
+    # print(valloader.dataset.images.shape)
     with torch.no_grad():
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(valloader):
+        for batch_idx, (inputs, targets) in enumerate(valloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
+            # print("4Inputs shape:")
+            # print(inputs.shape)
             outs = net(inputs)
             outputs = outs['outputs']    
             aux_outputs = outs['aux_out']
@@ -98,7 +108,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
         pred_list_temp = []
         label_list_temp = []
         
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(closerloader):
+        for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
             outs = net(inputs)
             outputs = outs['outputs']    
@@ -125,7 +135,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
                       'confusion_matrix':confusion_matrix}        
         
         prob_total = None
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(closerloader):
+        for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outs = net(inputs)
             outputs = outs['outputs']
@@ -136,7 +146,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
                 prob_total = torch.cat([prob_total, prob])
             targets_list.append(targets.cpu().numpy())
         
-        for batch_idx, (inputs, targets, img_dirs) in enumerate(openloader):
+        for batch_idx, (inputs, targets) in enumerate(openloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outs = net(inputs)
             outputs = outs['outputs']
