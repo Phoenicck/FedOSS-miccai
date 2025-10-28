@@ -144,7 +144,10 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
                 prob_total = prob
             else:
                 prob_total = torch.cat([prob_total, prob])
-            targets_list.append(targets.cpu().numpy())
+            
+            #targets_list.append(targets.cpu().numpy())
+            targets_array = targets.cpu().numpy().flatten()
+            targets_list.append(targets_array)
         
         for batch_idx, (inputs, targets) in enumerate(openloader):
             inputs, targets = inputs.to(device), targets.to(device)
@@ -153,11 +156,14 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
             prob=nn.functional.softmax(outputs/temperature,dim=-1)
             prob_total = torch.cat([prob_total, prob])
             
-            targets = np.ones_like(targets.cpu().numpy())*args.known_class
-            targets_list.append(targets)
+            # targets = np.ones_like(targets.cpu().numpy())*args.known_class
+            # targets_list.append(targets)
+            targets = np.ones_like(targets.cpu().numpy()) * args.known_class
+            targets_array = targets.flatten()
+            targets_list.append(targets_array)
 
         # openset recognition    
-        targets_list=np.reshape(np.array(targets_list),(-1))          
+        targets_list = np.concatenate(targets_list).reshape(-1)        
         _, pred_list = prob_total.max(1)
         pred_list = pred_list.cpu().numpy()
         
