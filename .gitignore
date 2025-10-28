@@ -2,3 +2,5 @@
 *.zip
 *.npz
 *.pyc
+datasets/Cifar10-com/Cifar10/rawdata
+*.json
