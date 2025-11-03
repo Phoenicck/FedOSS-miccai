@@ -1,33 +1,52 @@
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+# 1. 导入 transforms 库
+from torchvision import transforms 
 
 class SimpleNPZDataset(Dataset):
     def __init__(self, npz_path, label_filter):
-        #data = np.load(npz_path)
         
-
+        # ⚠️ 注意：如果目标是返回 HWC，我们不应使用 transforms.ToTensor()。
+        # 我们只保留归一化参数，并在 __getitem__ 中手动应用。
+        self.mean = 0.5
+        self.std = 0.5
+        
         with open(npz_path, 'rb') as f:
             data = np.load(f, allow_pickle=True)['data'].tolist()
-        # keys = data.keys()
         
-        # # 打印结果
-        # print(f"文件 '{npz_path}' 中包含的键（keys）有：")
-        # print(keys)
         images = data['x']
-        #print(images.shape)
         labels = data['y']
-        #print(labels.shape)
+        
         mask = label_filter(labels)
         self.images = images[mask]
         self.labels = labels[mask]
+        
+        mask_open = self.labels >= 6
+        if np.any(mask_open):
+            self.labels[mask_open] = 6
 
     def __len__(self):
         return len(self.labels)
+        
     def __getitem__(self, idx):
-        img = self.images[idx]
+        img = self.images[idx] # img 是 HWC NumPy array
         label = self.labels[idx]
-        #img = torch.tensor(img).permute(2,0,1).float() / 255.0  # 假设是HWC
+        
+        # 1. 转换为 float 并缩放到 [0.0, 1.0]
+        img = img.astype(np.float32) / 255.0
+        
+        # 2. 应用 [-1.0, 1.0] 的归一化
+        img = (img - self.mean) / self.std
+        
+        # 3. 转换为 PyTorch Tensor（保持 HWC 格式）
+        # 注意：这里只进行 Tensor 转换，不进行维度调整 (ToTensor() 会自动调整)
+        img = torch.tensor(img) 
+
+        # img 现在是 HWC 格式的 Tensor，范围是 [-1.0, 1.0]
+        # 但是，这通常不是 PyTorch 模型期望的格式 (CHW)
+        
         return img, int(label)
 
 def get_dataloaders(data_root, batchsize=10, num_workers=1):
@@ -37,44 +56,31 @@ def get_dataloaders(data_root, batchsize=10, num_workers=1):
         npz_path = f"{data_root}/train/{i}.npz"
         ds = SimpleNPZDataset(npz_path, label_filter=lambda y: y < 6)
         trainloaders.append(DataLoader(ds, batch_size=batchsize, shuffle=True, num_workers=num_workers))
-    # test数据
-    test_imgs, test_labels = [], []
+        
+    # valloader and closerloader from centralized_close_test.npz
+    close_test_path = f"{data_root}/centralized_close_test.npz"
+    close_ds = SimpleNPZDataset(close_test_path, label_filter=lambda y: y < 6)
+    valloader = DataLoader(close_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
+    closerloader = DataLoader(close_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
+
+    # openloader from centralized_open_test.npz
+    open_test_path = f"{data_root}/centralized_open_test.npz"
+    open_ds = SimpleNPZDataset(open_test_path, label_filter=lambda y: y >= 6)
+    openloader = DataLoader(open_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
+
+    # train_val_loaders from test/0.npz, test/1.npz, ...
+    train_val_loaders = []
     for i in range(5):
         npz_path = f"{data_root}/test/{i}.npz"
-        with open(npz_path, 'rb') as f:
-            data = np.load(f, allow_pickle=True)['data'].tolist()
-
-        #data = np.load(npz_path)
-
-
-        test_imgs.append(data['x'])
-        test_labels.append(data['y'])
-    test_imgs = np.concatenate(test_imgs, axis=0)
-    test_labels = np.concatenate(test_labels, axis=0)
-    # valloader/closerloader/train_val_loaders: label<6
-    mask_close = test_labels < 6
-    close_ds = torch.utils.data.TensorDataset(
-        torch.tensor(test_imgs[mask_close]).float() / 255.0,
-        torch.tensor(test_labels[mask_close]).long()
-    )
-    valloader = DataLoader(close_ds, batch_size=10, shuffle=False, num_workers=num_workers)
-    closerloader = DataLoader(close_ds, batch_size=10, shuffle=False, num_workers=num_workers)
-    train_val_loaders = [closerloader for _ in range(5)]  # 你可以按需复制
-    # openloader: label>=6
-    mask_open = test_labels >= 6
-    open_ds = torch.utils.data.TensorDataset(
-        torch.tensor(test_imgs[mask_open]).float() / 255.0,
-        torch.tensor(test_labels[mask_open]).long()
-    )
-    openloader = DataLoader(open_ds, batch_size=10, shuffle=False, num_workers=num_workers)
+        ds = SimpleNPZDataset(npz_path, label_filter=lambda y: y < 6)
+        train_val_loaders.append(DataLoader(ds, batch_size=batchsize, shuffle=False, num_workers=num_workers))
+    
     print("\n--- Dataloader Batch Shapes Check ---")
     
     # 1. 打印第一个训练客户端的 Batch 形状
     try:
         if trainloaders:
-            # 获取第一个客户端的 DataLoader
             dl = trainloaders[0]
-            # 迭代一次以获取第一个批次
             inputs, targets = next(iter(dl))
             print(f"✅ trainloaders[0] Batch Shape (Images, Labels): {inputs.shape}, {targets.shape}")
         else:
@@ -120,4 +126,3 @@ def get_dataloaders(data_root, batchsize=10, num_workers=1):
     print("---------------------------------------")
     
     return trainloaders, valloader, closerloader, openloader, train_val_loaders
-    #return trainloaders, valloader, closerloader, openloader, train_val_loaders

@@ -23,12 +23,20 @@ def train(args, device, epoch, net, trainloader, optimizer):
         #print("4Inputs shape:")
         #print(inputs.shape)
         inputs, targets = inputs.to(device), targets.long().to(device)
+        
         optimizer.zero_grad()
-        #print("5Inputs shape:")
-        #print(inputs.shape)
+        
         outs = net(inputs)
+        
+
         outputs = outs['outputs']    
         aux_outputs = outs['aux_out']
+
+        # print('trian='*25)
+        # print(targets)
+        # print(outputs)
+        
+        
         loss = criterion(outputs, targets)        
         loss += criterion(aux_outputs, targets)  
         loss.backward()
@@ -68,6 +76,8 @@ def val(args, device, epoch, net, valloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
             # print("4Inputs shape:")
             # print(inputs.shape)
+            # print(targets)
+            # print('='*25)
             outs = net(inputs)
             outputs = outs['outputs']    
             aux_outputs = outs['aux_out']
@@ -110,6 +120,7 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
         
         for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.long().to(device)
+            
             outs = net(inputs)
             outputs = outs['outputs']    
             aux_outputs = outs['aux_out']
@@ -137,6 +148,8 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
         prob_total = None
         for batch_idx, (inputs, targets) in enumerate(closerloader):
             inputs, targets = inputs.to(device), targets.to(device)
+            # print('close='*25)
+            # print(targets)
             outs = net(inputs)
             outputs = outs['outputs']
             prob=nn.functional.softmax(outputs/temperature,dim=-1)
@@ -151,6 +164,8 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
         
         for batch_idx, (inputs, targets) in enumerate(openloader):
             inputs, targets = inputs.to(device), targets.to(device)
+            # print(targets)
+            # print('open='*25)
             outs = net(inputs)
             outputs = outs['outputs']
             prob=nn.functional.softmax(outputs/temperature,dim=-1)
