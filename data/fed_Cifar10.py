@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms 
 
 class SimpleNPZDataset(Dataset):
-    def __init__(self, npz_path, label_filter):
+    def __init__(self, npz_path):
         
         # ⚠️ 注意：如果目标是返回 HWC，我们不应使用 transforms.ToTensor()。
         # 我们只保留归一化参数，并在 __getitem__ 中手动应用。
@@ -16,12 +16,8 @@ class SimpleNPZDataset(Dataset):
         with open(npz_path, 'rb') as f:
             data = np.load(f, allow_pickle=True)['data'].tolist()
         
-        images = data['x']
-        labels = data['y']
-        
-        mask = label_filter(labels)
-        self.images = images[mask]
-        self.labels = labels[mask]
+        self.images = data['x']
+        self.labels = data['y']
         
         mask_open = self.labels >= 6
         if np.any(mask_open):
@@ -54,25 +50,25 @@ def get_dataloaders(data_root, batchsize=10, num_workers=1):
     trainloaders = []
     for i in range(5):
         npz_path = f"{data_root}/train/{i}.npz"
-        ds = SimpleNPZDataset(npz_path, label_filter=lambda y: y < 6)
+        ds = SimpleNPZDataset(npz_path)
         trainloaders.append(DataLoader(ds, batch_size=batchsize, shuffle=True, num_workers=num_workers))
         
     # valloader and closerloader from centralized_close_test.npz
     close_test_path = f"{data_root}/centralized_close_test.npz"
-    close_ds = SimpleNPZDataset(close_test_path, label_filter=lambda y: y < 6)
+    close_ds = SimpleNPZDataset(close_test_path)
     valloader = DataLoader(close_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
     closerloader = DataLoader(close_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
 
     # openloader from centralized_open_test.npz
     open_test_path = f"{data_root}/centralized_open_test.npz"
-    open_ds = SimpleNPZDataset(open_test_path, label_filter=lambda y: y >= 6)
+    open_ds = SimpleNPZDataset(open_test_path)
     openloader = DataLoader(open_ds, batch_size=batchsize, shuffle=False, num_workers=num_workers)
 
     # train_val_loaders from test/0.npz, test/1.npz, ...
     train_val_loaders = []
     for i in range(5):
         npz_path = f"{data_root}/test/{i}.npz"
-        ds = SimpleNPZDataset(npz_path, label_filter=lambda y: y < 6)
+        ds = SimpleNPZDataset(npz_path)
         train_val_loaders.append(DataLoader(ds, batch_size=batchsize, shuffle=False, num_workers=num_workers))
     
     print("\n--- Dataloader Batch Shapes Check ---")
