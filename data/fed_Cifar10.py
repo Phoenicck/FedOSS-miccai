@@ -1,4 +1,3 @@
-
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -7,48 +6,28 @@ from torchvision import transforms
 
 class SimpleNPZDataset(Dataset):
     def __init__(self, npz_path):
-        
-        # ⚠️ 注意：如果目标是返回 HWC，我们不应使用 transforms.ToTensor()。
-        # 我们只保留归一化参数，并在 __getitem__ 中手动应用。
-        self.mean = 0.5
-        self.std = 0.5
-        
         with open(npz_path, 'rb') as f:
+            # The data is stored in a list containing one dictionary
             data = np.load(f, allow_pickle=True)['data'].tolist()
         
         self.images = data['x']
         self.labels = data['y']
-        
-        mask_open = self.labels >= 6
-        if np.any(mask_open):
-            self.labels[mask_open] = 6
 
     def __len__(self):
         return len(self.labels)
         
     def __getitem__(self, idx):
-        img = self.images[idx] # img 是 HWC NumPy array
+        img = self.images[idx]
         label = self.labels[idx]
         
-        # 1. 转换为 float 并缩放到 [0.0, 1.0]
-        img = img.astype(np.float32) / 255.0
-        
-        # 2. 应用 [-1.0, 1.0] 的归一化
-        img = (img - self.mean) / self.std
-        
-        # 3. 转换为 PyTorch Tensor（保持 HWC 格式）
-        # 注意：这里只进行 Tensor 转换，不进行维度调整 (ToTensor() 会自动调整)
-        img = torch.tensor(img) 
-
-        # img 现在是 HWC 格式的 Tensor，范围是 [-1.0, 1.0]
-        # 但是，这通常不是 PyTorch 模型期望的格式 (CHW)
-        
-        return img, int(label)
+        # Data is already pre-processed, just convert to tensor
+        return torch.tensor(img), int(label)
 
 def get_dataloaders(data_root, batchsize=10, num_workers=1):
     # trainloaders: 5个客户端
     trainloaders = []
     for i in range(5):
+        print(f"Loading training data for client {i} from {data_root}/train/{i}.npz")
         npz_path = f"{data_root}/train/{i}.npz"
         ds = SimpleNPZDataset(npz_path)
         trainloaders.append(DataLoader(ds, batch_size=batchsize, shuffle=True, num_workers=num_workers))

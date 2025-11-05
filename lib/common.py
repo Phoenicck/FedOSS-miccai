@@ -30,7 +30,7 @@ def setup(args, trainloaders):
     else:
         device = 'cuda:5' if torch.cuda.is_available() else 'cpu'
         
-    pretrained = True
+    pretrained = False
     print(f'==> Building [{args.backbone}] model..')
     base0 = './results/'
     if args.mode == 'Pretrain':

@@ -164,22 +164,56 @@ def train(args, device, epoch, net, trainloader, optimizer, net_peers=None, atta
         del inputs, loss
         gc.collect()
 
-    if epoch in args.start_epoch:      
-        for index in range(args.known_class):            
-            if unknown_dict[index] is not None:                
+    # if epoch in args.start_epoch:      
+    #     for index in range(args.known_class):            
+    #         if unknown_dict[index] is not None:                
+    #             mean_dict[index] = unknown_dict[index].mean(0).cpu()
+    #             X = unknown_dict[index] - unknown_dict[index].mean(0)
+    #             cov_matrix = torch.mm(X.t(), X) / len(X)
+    #             cov_dict[index] = cov_matrix.cpu()
+    #             number_dict[index] =  len(X)
+    #             del cov_matrix, X                
+    #         else:
+    #             for i in range(args.known_class):   
+    #                 if unknown_dict[i] is not None:
+    #                    break
+    #             D = unknown_dict[i].shape[1]   
+    #             mean_dict[index] = torch.zeros(D) 
+    #             cov_dict[index] = torch.zeros(D, D)
+    if epoch in args.start_epoch: 
+    
+        # 1. 预先查找第一个非 None 的维度 D
+        feature_dim_D = None
+        for i in range(args.known_class):
+            if unknown_dict[i] is not None:
+                # 找到第一个非 None 的元素的维度
+                feature_dim_D = unknown_dict[i].shape[1]
+                break
+                
+        # 如果整个 unknown_dict 都是 None (即 feature_dim_D 还是 None)，我们需要一个安全的回退值 D
+        if feature_dim_D is None:
+            # 警告：这里需要您根据您的模型特征（discrete_feats）的实际维度进行替换。
+            # 假设特征维度是 8192 或 4096，或者您在模型中能确定的其他值。
+            # 这里使用一个占位符，您需要修改它。
+            print("WARNING: All classes in unknown_dict are None. Using hardcoded feature dimension 8192.")
+            feature_dim_D = 8192 # <--- ！！！请替换为您模型中 discrete_feats 的实际维度！！！
+
+        for index in range(args.known_class): 
+            if unknown_dict[index] is not None: 
+                # --- 正常计算均值和协方差 ---
                 mean_dict[index] = unknown_dict[index].mean(0).cpu()
                 X = unknown_dict[index] - unknown_dict[index].mean(0)
                 cov_matrix = torch.mm(X.t(), X) / len(X)
                 cov_dict[index] = cov_matrix.cpu()
-                number_dict[index] =  len(X)
-                del cov_matrix, X                
+                number_dict[index] = len(X)
+                del cov_matrix, X 
             else:
-                for i in range(args.known_class):   
-                    if unknown_dict[i] is not None:
-                       break
-                D = unknown_dict[i].shape[1]   
+                # --- 安全地初始化零矩阵 ---
+                # 使用前面确定的 feature_dim_D
+                D = feature_dim_D
                 mean_dict[index] = torch.zeros(D) 
-                cov_dict[index] = torch.zeros(D, D)                          
+                cov_dict[index] = torch.zeros(D, D) 
+                              
         del unknown_dict
         gc.collect()
         
