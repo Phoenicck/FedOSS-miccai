@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from sklearn import metrics
+from sklearn.metrics import roc_auc_score, auc
 from random import sample
 import gc
 
@@ -355,13 +356,12 @@ def val(args, device, epoch, net, valloader):
 #                       'precision':precision,
 #                       'confusion_matrix': confusion_matrix}
 
-#     return osr_result, close_test_result
-
 def test(args, device, epoch, net, closerloader, openloader, threshold=0):
     import torch
     import torch.nn as nn
     import numpy as np
     from sklearn import metrics
+    from sklearn.metrics import roc_auc_score, auc
 
     net.eval()
     temperature = 1.
@@ -455,6 +455,50 @@ def test(args, device, epoch, net, closerloader, openloader, threshold=0):
             'precision': precision,
             'confusion_matrix': confusion_matrix
         }
+
+        # ---------- 新增：AUROC 和 OSCR 计算 ----------
+        
+        # 1. 计算 AUROC
+        # 使用 one-vs-rest 策略处理多分类问题
+        all_probs = prob_total.cpu().numpy()
+        auroc = roc_auc_score(targets_list, all_probs, multi_class='ovr')
+        
+        # 2. 计算 OSCR
+        # OSCR = Area under the (Correct Classification Rate vs. False Positive Rate) curve
+        known_mask = targets_list < args.known_class
+        unknown_mask = targets_list == args.known_class
+        
+        known_scores = all_probs[known_mask]
+        unknown_scores = all_probs[unknown_mask]
+
+        # 获取每个样本的最大 softmax 分数作为置信度
+        known_conf = np.max(known_scores[:, :-1], axis=1) # 已知类的置信度只在已知类logit中看
+        unknown_conf = np.max(unknown_scores[:, :-1], axis=1)
+
+        # 对置信度进行排序，作为阈值
+        thresholds = np.sort(np.concatenate((known_conf, unknown_conf)))
+        
+        ccr_list = [] # Correct Classification Rate for knowns
+        fpr_list = [] # False Positive Rate for unknowns
+
+        for th in thresholds:
+            # CCR: 多少已知样本被正确分类为已知类，且置信度高于阈值
+            correctly_classified_knowns = np.sum((np.argmax(known_scores, axis=1) == targets_list[known_mask]) & (known_conf >= th))
+            ccr = correctly_classified_knowns / np.sum(known_mask)
+            
+            # FPR: 多少未知样本被错误分类为已知类，且置信度高于阈值
+            falsely_classified_unknowns = np.sum(unknown_conf >= th)
+            fpr = falsely_classified_unknowns / np.sum(unknown_mask)
+            
+            ccr_list.append(ccr)
+            fpr_list.append(fpr)
+            
+        # 使用 trapezoidal rule 计算曲线下面积 (AUC)
+        oscr = auc(fpr_list, ccr_list)
+
+        # 将新指标添加到 osr_result
+        osr_result['auroc'] = auroc * 100 # 转换为百分比
+        osr_result['oscr'] = oscr * 100  # 转换为百分比
 
         # ---------- OSDA metrics ----------
         # known_accuracy: known-class samples which are correctly classified among known classes

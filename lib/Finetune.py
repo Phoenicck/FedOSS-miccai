@@ -62,30 +62,41 @@ def run(args):
             del number_clients
             gc.collect()
         osr_result, close_test_result, osda_result= test(args, device, epoch, server_model, closerloader, openloader)
-        osr_acc, osr_f1, osr_recall, osr_precision = osr_result['acc'],osr_result['f1'],osr_result['recall'],osr_result['precision']
-        test_loss, test_acc, test_f1, test_recall, test_precision = close_test_result['loss'], close_test_result['acc'],close_test_result['f1'],close_test_result['recall'],close_test_result['precision']   
-        osda_os_start, osda_unk, osda_hos = osda_result['os_known_acc'],osda_result['os_unk_acc'],osda_result['HOS']
-        print() 
-        print(f"Test-  OSR [{epoch}/{args.epoches}] LR={args.lr:.7f} ACC={osr_acc:.3f} F1={osr_f1:.3f} Rec={osr_recall:.3f} Prec={osr_precision:.3f}")
-        print(f"Test-Close [{epoch}/{args.epoches}] LR={args.lr:.7f} loss={test_loss:.3f} ACC={test_acc:.3f} F1={test_f1:.3f} Rec={test_recall:.3f} Prec={test_precision:.3f}")                     
+        
+        # 解包所有指标，包括新增的 auroc 和 oscr
+        osr_acc, osr_f1, osr_recall, osr_precision = osr_result['acc'], osr_result['f1'], osr_result['recall'], osr_result['precision']
+        osr_auroc, osr_oscr = osr_result['auroc'], osr_result['oscr']
+
+        test_loss, test_acc, test_f1, test_recall, test_precision = close_test_result['loss'], close_test_result['acc'], close_test_result['f1'], close_test_result['recall'], close_test_result['precision']
+        osda_os_start, osda_unk, osda_hos = osda_result['os_known_acc'], osda_result['os_unk_acc'], osda_result['HOS']
+
+        print()
+        # 在打印信息中加入 AUROC 和 OSCR
+        print(f"Test-  OSR [{epoch}/{args.epoches}] LR={args.lr:.7f} ACC={osr_acc:.3f} F1={osr_f1:.3f} Rec={osr_recall:.3f} Prec={osr_precision:.3f} AUROC={osr_auroc:.3f} OSCR={osr_oscr:.3f}")
+        print(f"Test-Close [{epoch}/{args.epoches}] LR={args.lr:.7f} loss={test_loss:.3f} ACC={test_acc:.3f} F1={test_f1:.3f} Rec={test_recall:.3f} Prec={test_precision:.3f}")
         print(f"Test- OSDA  [{epoch}/{args.epoches}] LR={args.lr:.7f} OS_Acc={osda_os_start:.3f} UNK_Acc={osda_unk:.3f} HOS={osda_hos:.3f}")
         print()
+
         if osr_f1 > best_f1:
             best_epoch = epoch
             best_f1 = osr_f1
-            string1 = f"Test-  OSR [{epoch}/{args.epoches}] LR={args.lr:.7f} ACC={osr_acc:.3f} F1={osr_f1:.3f} Rec={osr_recall:.3f} Prec={osr_precision:.3f}"
+            # 在保存的最佳结果字符串中也加入新指标
+            string1 = f"Test-  OSR [{epoch}/{args.epoches}] LR={args.lr:.7f} ACC={osr_acc:.3f} F1={osr_f1:.3f} Rec={osr_recall:.3f} Prec={osr_precision:.3f} AUROC={osr_auroc:.3f} OSCR={osr_oscr:.3f}"
             string2 = f"Test-Close [{epoch}/{args.epoches}] LR={args.lr:.7f} loss={test_loss:.3f} ACC={test_acc:.3f} F1={test_f1:.3f} Rec={test_recall:.3f} Prec={test_precision:.3f}"
             string3 = f"Test- OSDA  [{epoch}/{args.epoches}] LR={args.lr:.7f} OS_Acc={osda_os_start:.3f} UNK_Acc={osda_unk:.3f} HOS={osda_hos:.3f}"
 
             state = {
                 'net': server_model.state_dict(),
-                'osr_acc':osr_acc,
-                'osr_f1':osr_f1, 
-                'osr_recall':osr_recall,
-                'osr_precision':osr_precision,
+                'osr_acc': osr_acc,
+                'osr_f1': osr_f1,
+                'osr_recall': osr_recall,
+                'osr_precision': osr_precision,
+                # 保存新指标到 checkpoint
+                'osr_auroc': osr_auroc,
+                'osr_oscr': osr_oscr,
                 'epoch': best_epoch,
-                }
-            torch.save(state, osp.join(args.save_path,'best_finetune_ckpt_'+args.mode+'.pth'))        
+            }
+            torch.save(state, osp.join(args.save_path, 'best_finetune_ckpt_' + args.mode + '.pth'))
             print(f'Saving best model . . . . . . . .')
             print()
         epoch += 1
@@ -96,4 +107,3 @@ def run(args):
     print(string2)
     print(string3)
     print('=====================================================================================================================================')
-        
